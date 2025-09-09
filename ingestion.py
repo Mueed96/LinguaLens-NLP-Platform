@@ -78,3 +78,19 @@ if __name__ == '__main__':
 
     # Note: To test PDF and TXT functions, you would need to write more complex test code
     # to open local files. For now, we'll test them through the web interface later.
+
+    # Add this new function to ingestion.py
+import feedparser
+
+def parse_rss_feed(feed_url):
+    """Parses an RSS feed and returns a list of articles (title, link)."""
+    try:
+        feed = feedparser.parse(feed_url)
+        # Check if the feed was parsed correctly
+        if feed.bozo:
+            raise Exception(feed.bozo_exception)
+        # Create a list of dictionaries, one for each article
+        return [{"title": entry.title, "link": entry.link} for entry in feed.entries]
+    except Exception as e:
+        print(f"Error parsing RSS feed: {e}")
+        return [] # Return an empty list on failure

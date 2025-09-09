@@ -1,8 +1,8 @@
-# app.py
+# app.py (DEFINITIVE FINAL VERSION with All Fixes)
 
 import streamlit as st
 import time
-from ingestion import get_text_from_url, get_text_from_pdf, get_text_from_txt
+from ingestion import get_text_from_url, get_text_from_pdf, get_text_from_txt, parse_rss_feed
 from nlp_processor import detect_language, summarize_text, analyze_sentiment
 
 # --- Helper Functions ---
@@ -37,6 +37,20 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- State Initialization ---
+if 'article_text' not in st.session_state:
+    st.session_state.article_text = ""
+if 'analysis_results' not in st.session_state:
+    st.session_state.analysis_results = None
+if 'rss_articles' not in st.session_state:
+    st.session_state.rss_articles = []
+
+# --- Centered Header ---
+with st.container():
+    st.markdown("<h1 style='text-align: center;'><span class='spinning-globe'>🌐</span> LinguaLens</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>🔎 <i>Bringing Clarity to Global News.</i></h4>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>A Project By Abdul Mueed</p>", unsafe_allow_html=True)
+
 # --- CSS for Spinning Animation ---
 st.markdown("""
 <style>
@@ -51,27 +65,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-
-# --- State Initialization ---
-if 'article_text' not in st.session_state:
-    st.session_state.article_text = ""
-if 'analysis_results' not in st.session_state:
-    st.session_state.analysis_results = None
-
-# --- Centered Header ---
-with st.container():
-    # --- The globe is wrapped in a span to apply the animation ---
-    st.markdown("<h1 style='text-align: center;'><span class='spinning-globe'>🌐</span> LinguaLens</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center;'>🔎 <i>Bringing Clarity to Global News.</i></h4>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>A Project By Abdul Mueed</p>", unsafe_allow_html=True)
-
 st.divider()
 
 # --- Input Section ---
 with st.container():
     st.header("📥 Provide an Article to Analyze")
     
-    tab1, tab2, tab3 = st.tabs(["✍️ Paste Text", "🔗 URL", "📄 File Upload"])
+    tab1, tab2, tab3, tab4 = st.tabs(["✍️ Paste Text", "🔗 URL", "📄 File Upload", "📰 RSS Feed"])
 
     with tab1:
         pasted_text = st.text_area("Paste the article text below:", height=250, key="pasted_text")
@@ -87,13 +87,12 @@ with st.container():
                 with st.spinner("Fetching article..."):
                     fetched_text = get_text_from_url(url_input)
                     st.session_state.analysis_results = None
-                    
                     if fetched_text:
                         st.session_state.article_text = fetched_text
                         st.toast("Article fetched successfully!", icon="✅")
                     else:
                         st.session_state.article_text = ""
-                        st.error("Failed to fetch article. The website may be blocking scrapers or the URL is invalid. Please try a different URL or paste the text directly.")
+                        st.error("Failed to fetch article. Please try a different URL or paste the text directly.")
             else:
                 st.warning("Please enter a URL.")
 
@@ -108,9 +107,36 @@ with st.container():
                 st.session_state.analysis_results = None
                 st.toast("File loaded!", icon="📄")
 
+    with tab4:
+        feed_url = st.text_input("Enter RSS feed URL", placeholder="e.g., http://feeds.bbci.co.uk/news/world/rss.xml")
+        if st.button("Fetch Feed", use_container_width=True):
+            with st.spinner("Fetching articles from feed..."):
+                st.session_state.rss_articles = parse_rss_feed(feed_url)
+                if not st.session_state.rss_articles:
+                    st.error("Could not fetch articles. Please check the RSS feed URL.")
+        
+        if st.session_state.rss_articles:
+            article_titles = [article['title'] for article in st.session_state.rss_articles]
+            selected_index = st.selectbox("Select an article from the feed:", options=range(len(article_titles)), format_func=lambda i: article_titles[i])
+            
+            if st.button("Load Selected Article", use_container_width=True, type="primary"):
+                selected_link = st.session_state.rss_articles[selected_index]['link']
+                if selected_link:
+                    with st.spinner("Fetching full article text..."):
+                        # --- THIS SECTION IS THE FINAL FIX ---
+                        fetched_text = get_text_from_url(selected_link)
+                        st.session_state.analysis_results = None
+
+                        if fetched_text:
+                            st.session_state.article_text = fetched_text
+                            st.toast("Article loaded!", icon="✅")
+                        else:
+                            st.session_state.article_text = ""
+                            st.error("Failed to fetch this specific article. The website may be blocking the scraper. Please try a different article from the feed.")
+
 st.divider()
 
-# --- Analysis Trigger ---
+# --- Analysis Trigger and Results Display ---
 if st.session_state.article_text:
     st.header("🚀 Review and Analyze")
     
@@ -136,7 +162,6 @@ if st.session_state.article_text:
                 "analysis_time": analysis_duration
             }
 
-# --- Results Display ---
 if st.session_state.analysis_results:
     st.divider()
     st.header("📊 Read the Analysis")
@@ -146,6 +171,7 @@ if st.session_state.analysis_results:
         "📖 Summary", "😊 Sentiment", "🌐 Language", "📊 Statistics", "📄 Original Text"
     ])
     
+    # ... (rest of the results display is unchanged)
     with res_tab1:
         st.subheader("Generated Article Summary")
         if not results["summary_error"]:
@@ -173,7 +199,6 @@ if st.session_state.analysis_results:
     with res_tab4:
         st.subheader("Analysis Statistics")
         stats = results["stats"]
-        
         row1_col1, row1_col2 = st.columns(2)
         row2_col1, row2_col2 = st.columns(2)
 
@@ -189,7 +214,6 @@ if st.session_state.analysis_results:
         with row2_col2:
             with st.container(border=True):
                 st.metric("Compression Rate", f'{stats["compression_rate"]:.1f}%')
-        
         st.divider()
         with st.container(border=True):
              formatted_time = format_time(results['analysis_time'])
@@ -200,4 +224,4 @@ if st.session_state.analysis_results:
         st.text_area("", st.session_state.article_text, height=400)
 
 elif not st.session_state.article_text:
-    st.info("Your analyzed article results will appear here.")
+    st.info("Your analyzed article results will appear here once you provide a source.")
