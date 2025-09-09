@@ -108,7 +108,7 @@ with st.container():
                 st.toast("File loaded!", icon="📄")
 
     with tab4:
-        feed_url = st.text_input("Enter RSS feed URL", placeholder="e.g., http://feeds.bbci.co.uk/news/world/rss.xml")
+        feed_url = st.text_input("Enter RSS feed URL")
         if st.button("Fetch Feed", use_container_width=True, key="fetch_feed_button"):
             with st.spinner("Fetching articles from feed..."):
                 st.session_state.rss_articles = parse_rss_feed(feed_url)
